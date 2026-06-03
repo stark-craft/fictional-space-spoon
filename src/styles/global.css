@@ -5165,6 +5165,10 @@ body,
   overflow: visible;
 }
 
+.ai-generated-row-slot {
+  display: none;
+}
+
 .ai-generated-row-shell::before {
   content: "";
   position: absolute;

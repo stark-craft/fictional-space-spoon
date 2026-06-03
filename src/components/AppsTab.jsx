@@ -237,6 +237,7 @@ export default function AppsTab({
 
   const handleSubmitIntent = (query) => {
     window.clearTimeout(aiGenerationTimerRef.current);
+    onSponsoredBlur?.();
     setLastAiQuery(query);
     setIsGeneratingAiRow(true);
     setShowAiRow(false);
@@ -273,32 +274,44 @@ export default function AppsTab({
         />
       </div>
 
-      {showAiRow &&
-        (() => {
-          const aiRowSectionRef = sectionRef(sIdx++);
+      {(() => {
+        const aiRowSectionRef = sectionRef(sIdx++);
 
+        if (!showAiRow) {
           return (
             <div
               ref={(el) => {
-                aiGeneratedRowRef.current = el;
+                aiGeneratedRowRef.current = null;
                 aiRowSectionRef(el);
               }}
-              className="ai-generated-row-shell sponsored-section"
-              data-ai-query={lastAiQuery}
-            >
-              <PromoRow
-                title="AI Picks for Your Switzerland Trip"
-                items={switzerlandTripPromos}
-                sourcePage="apps"
-                rowKey="apps-ai-switzerland"
-                variant="appSpotlight"
-                immersiveState={immersiveState}
-                onSponsoredFocus={onSponsoredFocus}
-                onSponsoredBlur={onSponsoredBlur}
-              />
-            </div>
+              className="ai-generated-row-slot"
+              aria-hidden="true"
+            />
           );
-        })()}
+        }
+
+        return (
+          <div
+            ref={(el) => {
+              aiGeneratedRowRef.current = el;
+              aiRowSectionRef(el);
+            }}
+            className="ai-generated-row-shell sponsored-section"
+            data-ai-query={lastAiQuery}
+          >
+            <PromoRow
+              title="AI Picks for Your Switzerland Trip"
+              items={switzerlandTripPromos}
+              sourcePage="apps"
+              rowKey="apps-ai-switzerland"
+              variant="appSpotlight"
+              immersiveState={immersiveState}
+              onSponsoredFocus={onSponsoredFocus}
+              onSponsoredBlur={onSponsoredBlur}
+            />
+          </div>
+        );
+      })()}
 
       <div ref={sectionRef(sIdx++)}>
         <ScreenshotCardRow title="Editor's Choice" items={editorsChoice} />

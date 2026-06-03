@@ -40,6 +40,13 @@ export const platformLogos = {
   MakeMyTrip: "https://companieslogo.com/img/orig/MMYT-ca98a9f1.png?t=1720244492",
   Hoichoi: "https://storage.googleapis.com/takeapp/media/cm1r2qi1j00010cl12kgd6p7z.jpg",
   "Discovery+": "",
+  GetYourGuide: "",
+  TheFork: "",
+  Ticketcorner: "",
+  Tripadvisor: "",
+  Ticketmaster: "",
+  AccuWeather: "",
+  Airalo: "",
   Swiggy:
     "https://media-assets.swiggy.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_260/portal/m/seo/Logos/Swiggy/Swiggy%20logo-2.png",
   "Swiss Travel System": "",
