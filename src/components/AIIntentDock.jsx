@@ -16,12 +16,14 @@ function getMappedKey(e) {
 export default function AIIntentDock({
   onSubmitIntent,
   isGenerating,
-  hasGeneratedRow,
+  planCount = 0,
+  openRequestToken = 0,
 }) {
   const [expanded, setExpanded] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef(null);
   const submitRef = useRef(null);
+  const handledOpenRequestRef = useRef(0);
 
   useEffect(() => {
     if (!expanded) return;
@@ -33,11 +35,31 @@ export default function AIIntentDock({
     return () => clearTimeout(timer);
   }, [expanded]);
 
+  useEffect(() => {
+    if (
+      !openRequestToken ||
+      openRequestToken === handledOpenRequestRef.current
+    ) {
+      return;
+    }
+
+    handledOpenRequestRef.current = openRequestToken;
+    if (isGenerating) return;
+
+    const timer = window.setTimeout(() => setExpanded(true), 0);
+    return () => window.clearTimeout(timer);
+  }, [isGenerating, openRequestToken]);
+
   const submitIntent = () => {
     if (isGenerating) return;
 
     const query = inputValue.trim() || DEFAULT_QUERY;
-    onSubmitIntent?.(query);
+    const accepted = onSubmitIntent?.(query);
+
+    if (accepted !== false) {
+      setInputValue("");
+      setExpanded(false);
+    }
   };
 
   const expandDock = () => {
@@ -130,7 +152,9 @@ export default function AIIntentDock({
           <div className="ai-intent-copy">
             <div className="ai-intent-title">Ask Universal Guide</div>
             <div className="ai-intent-subtitle">
-              Plan a trip, find an app, or build a watchlist
+              {planCount > 0
+                ? `Build another journey · ${planCount} of 3 active`
+                : "Plan a trip, find an app, or build a watchlist"}
             </div>
           </div>
         )}
@@ -161,7 +185,7 @@ export default function AIIntentDock({
                 submitIntent();
               }}
             >
-              Build
+              Build plan
             </button>
           </div>
         )}
@@ -169,7 +193,7 @@ export default function AIIntentDock({
 
       {isGenerating && (
         <div className="ai-intent-generating" aria-live="polite">
-          <span>Building your AI picks</span>
+          <span>Building your connected journey</span>
           <span className="ai-intent-dots" aria-hidden="true">
             <i />
             <i />
@@ -178,8 +202,11 @@ export default function AIIntentDock({
         </div>
       )}
 
-      {!isGenerating && hasGeneratedRow && (
-        <div className="ai-intent-status">AI row created above</div>
+      {!isGenerating && planCount > 0 && (
+        <div className="ai-intent-status">
+          {planCount} active {planCount === 1 ? "plan" : "plans"} · select a
+          widget above to continue
+        </div>
       )}
     </div>
   );

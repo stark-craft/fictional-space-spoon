@@ -231,6 +231,84 @@ export default function useKeyNavigation(onHeroExpand, onHeroCollapse) {
 
       const focusedEl = document.activeElement;
 
+      const tripPlanLimitOverlay = document.getElementById(
+        "trip-plan-limit-overlay"
+      );
+
+      if (tripPlanLimitOverlay) {
+        if (
+          mappedKey === "Back" ||
+          mappedKey === "Backspace" ||
+          mappedKey === "Escape" ||
+          mappedKey === "XF86Back"
+        ) {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+          } catch (_) {}
+
+          window.dispatchEvent(new CustomEvent("trip-plan-limit-close"));
+          return;
+        }
+      }
+
+      const tripPlannerBoard = focusedEl?.closest?.(".trip-planner-board");
+
+      if (tripPlannerBoard) {
+        const focusedTripWidget = focusedEl?.closest?.(".trip-plan-widget");
+        const focusedJourneyWorkspace = focusedEl?.closest?.(
+          ".trip-journey-workspace"
+        );
+
+        if (
+          focusedTripWidget &&
+          mappedKey === "ArrowDown" &&
+          tripPlannerBoard.querySelector(".trip-journey-workspace")
+        ) {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+          } catch (_) {}
+
+          tripPlannerBoard
+            .querySelector(".trip-journey-step[tabindex='0']")
+            ?.focus({ preventScroll: true });
+          return;
+        }
+
+        if (focusedJourneyWorkspace && mappedKey === "ArrowUp") {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+          } catch (_) {}
+
+          tripPlannerBoard
+            .querySelector("[data-trip-widget-active='true']")
+            ?.focus({ preventScroll: true });
+          return;
+        }
+
+        if (
+          focusedJourneyWorkspace &&
+          (mappedKey === "Back" ||
+            mappedKey === "Backspace" ||
+            mappedKey === "Escape" ||
+            mappedKey === "XF86Back")
+        ) {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+          } catch (_) {}
+
+          window.dispatchEvent(new CustomEvent("trip-workspace-close"));
+          return;
+        }
+      }
+
       const expandedAiDock = focusedEl?.closest?.(".ai-intent-dock.expanded");
 
       if (expandedAiDock) {

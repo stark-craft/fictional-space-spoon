@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import MediaOutput from "./MediaOutput";
 import PromoRow from "./PromoRow";
 import AIIntentDock from "./AIIntentDock";
+import TripPlannerBoard from "./TripPlannerBoard";
 import { appsPromos } from "../data/promoContent";
-import { switzerlandTripPromos } from "../data/aiGeneratedContent";
+import { createTripPlan } from "../data/tripPlans";
 import {
   samsungRecommended,
   editorsChoice,
@@ -186,18 +187,26 @@ export default function AppsTab({
   personalizationVersion,
 }) {
   const topRef = useRef(null);
-  const aiGeneratedRowRef = useRef(null);
+  const tripPlannerRef = useRef(null);
+  const aiIntentSectionRef = useRef(null);
   const aiGenerationTimerRef = useRef(null);
+  const planSequenceRef = useRef(0);
   const [isGeneratingAiRow, setIsGeneratingAiRow] = useState(false);
-  const [showAiRow, setShowAiRow] = useState(false);
-  const [lastAiQuery, setLastAiQuery] = useState("");
+  const [tripPlans, setTripPlans] = useState([]);
+  const [activePlanId, setActivePlanId] = useState(null);
+  const [generationQuery, setGenerationQuery] = useState("");
+  const [pendingReplaceQuery, setPendingReplaceQuery] = useState("");
+  const [intentDockOpenRequest, setIntentDockOpenRequest] = useState(0);
   let sIdx = 2;
   const personalizedAppsPromos = useMemo(
-    () =>
-      getPersonalizedItems(appsPromos, {
+    () => {
+      void personalizationVersion;
+
+      return getPersonalizedItems(appsPromos, {
         page: "apps",
         row: "Promotional Row",
-      }),
+      });
+    },
     [personalizationVersion]
   );
 
@@ -212,21 +221,23 @@ export default function AppsTab({
     });
   };
 
-  const focusAiGeneratedRow = () => {
+  const focusTripPlan = (planId) => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const rowEl = aiGeneratedRowRef.current;
-        const firstCard = rowEl?.querySelector(".promo-card[tabindex='0']");
+        const boardEl = tripPlannerRef.current;
+        const planWidget = boardEl?.querySelector(
+          `[data-trip-plan-id="${planId}"]`
+        );
 
-        rowEl?.scrollIntoView({
+        boardEl?.scrollIntoView({
           behavior: "smooth",
           block: "start",
         });
 
         window.setTimeout(() => {
-          firstCard?.focus({ preventScroll: true });
-          firstCard?.scrollIntoView({
-            behavior: "smooth",
+          planWidget?.focus();
+          planWidget?.scrollIntoView({
+            behavior: "auto",
             block: "center",
             inline: "nearest",
           });
@@ -235,18 +246,70 @@ export default function AppsTab({
     });
   };
 
-  const handleSubmitIntent = (query) => {
+  const buildTripPlan = (query) => {
     window.clearTimeout(aiGenerationTimerRef.current);
     onSponsoredBlur?.();
-    setLastAiQuery(query);
+    setGenerationQuery(query);
     setIsGeneratingAiRow(true);
-    setShowAiRow(false);
 
     aiGenerationTimerRef.current = window.setTimeout(() => {
+      planSequenceRef.current += 1;
+      const plan = createTripPlan(query, planSequenceRef.current);
+
+      setTripPlans((currentPlans) => [...currentPlans, plan].slice(-3));
+      setActivePlanId(plan.id);
+      setGenerationQuery("");
       setIsGeneratingAiRow(false);
-      setShowAiRow(true);
-      focusAiGeneratedRow();
+      focusTripPlan(plan.id);
     }, 1500);
+  };
+
+  const handleSubmitIntent = (query) => {
+    if (isGeneratingAiRow) return false;
+
+    if (tripPlans.length >= 3) {
+      setPendingReplaceQuery(query);
+      tripPlannerRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      return true;
+    }
+
+    buildTripPlan(query);
+    return true;
+  };
+
+  const handleSelectPlan = (planId) => {
+    setActivePlanId(planId);
+  };
+
+  const handleDeletePlan = (planId) => {
+    setTripPlans((currentPlans) =>
+      currentPlans.filter((plan) => plan.id !== planId)
+    );
+    setActivePlanId((currentId) => (currentId === planId ? null : currentId));
+  };
+
+  const handleReplacePlan = (planId) => {
+    const query = pendingReplaceQuery;
+    setPendingReplaceQuery("");
+    setTripPlans((currentPlans) =>
+      currentPlans.filter((plan) => plan.id !== planId)
+    );
+    setActivePlanId(null);
+    buildTripPlan(query);
+  };
+
+  const handleRequestNewPlan = () => {
+    setIntentDockOpenRequest((request) => request + 1);
+
+    requestAnimationFrame(() => {
+      aiIntentSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
   };
 
   useEffect(() => {
@@ -275,40 +338,35 @@ export default function AppsTab({
       </div>
 
       {(() => {
-        const aiRowSectionRef = sectionRef(sIdx++);
-
-        if (!showAiRow) {
-          return (
-            <div
-              ref={(el) => {
-                aiGeneratedRowRef.current = null;
-                aiRowSectionRef(el);
-              }}
-              className="ai-generated-row-slot"
-              aria-hidden="true"
-            />
-          );
-        }
+        const tripPlannerSectionRef = sectionRef(sIdx++);
 
         return (
           <div
             ref={(el) => {
-              aiGeneratedRowRef.current = el;
-              aiRowSectionRef(el);
+              tripPlannerRef.current = el;
+              tripPlannerSectionRef(el);
             }}
-            className="ai-generated-row-shell sponsored-section"
-            data-ai-query={lastAiQuery}
+            className={
+              tripPlans.length > 0 || isGeneratingAiRow
+                ? "trip-planner-slot is-visible"
+                : "trip-planner-slot"
+            }
+            data-ai-query={generationQuery}
           >
-            <PromoRow
-              title="AI Picks for Your Switzerland Trip"
-              items={switzerlandTripPromos}
-              sourcePage="apps"
-              rowKey="apps-ai-switzerland"
-              variant="appSpotlight"
-              immersiveState={immersiveState}
-              onSponsoredFocus={onSponsoredFocus}
-              onSponsoredBlur={onSponsoredBlur}
-            />
+            {(tripPlans.length > 0 || isGeneratingAiRow) && (
+              <TripPlannerBoard
+                plans={tripPlans}
+                activePlanId={activePlanId}
+                isGenerating={isGeneratingAiRow}
+                pendingReplaceQuery={pendingReplaceQuery}
+                onSelectPlan={handleSelectPlan}
+                onClosePlan={() => setActivePlanId(null)}
+                onDeletePlan={handleDeletePlan}
+                onNewPlan={handleRequestNewPlan}
+                onReplacePlan={handleReplacePlan}
+                onCancelReplace={() => setPendingReplaceQuery("")}
+              />
+            )}
           </div>
         );
       })()}
@@ -341,13 +399,25 @@ export default function AppsTab({
         <MediaOutput />
       </div>
 
-      <div ref={sectionRef(sIdx++)}>
-        <AIIntentDock
-          onSubmitIntent={handleSubmitIntent}
-          isGenerating={isGeneratingAiRow}
-          hasGeneratedRow={showAiRow}
-        />
-      </div>
+      {(() => {
+        const aiIntentDockSectionRef = sectionRef(sIdx++);
+
+        return (
+          <div
+            ref={(el) => {
+              aiIntentSectionRef.current = el;
+              aiIntentDockSectionRef(el);
+            }}
+          >
+            <AIIntentDock
+              onSubmitIntent={handleSubmitIntent}
+              isGenerating={isGeneratingAiRow}
+              planCount={tripPlans.length}
+              openRequestToken={intentDockOpenRequest}
+            />
+          </div>
+        );
+      })()}
 
       <div className="scroll-top-section" ref={sectionRef(sIdx++)}>
         <div className="scroll-top-btn" tabIndex={0} onClick={scrollToTop}>
