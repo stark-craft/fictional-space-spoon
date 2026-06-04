@@ -4,7 +4,7 @@ import PromoRow from "./PromoRow";
 import AIIntentDock from "./AIIntentDock";
 import TripPlannerBoard from "./TripPlannerBoard";
 import { appsPromos } from "../data/promoContent";
-import { createTripPlan } from "../data/tripPlans";
+import { createTripPlan, getFeaturedTripPlans } from "../data/tripPlans";
 import {
   samsungRecommended,
   editorsChoice,
@@ -192,7 +192,7 @@ export default function AppsTab({
   const aiGenerationTimerRef = useRef(null);
   const planSequenceRef = useRef(0);
   const [isGeneratingAiRow, setIsGeneratingAiRow] = useState(false);
-  const [tripPlans, setTripPlans] = useState([]);
+  const [tripPlans, setTripPlans] = useState(getFeaturedTripPlans);
   const [activePlanId, setActivePlanId] = useState(null);
   const [generationQuery, setGenerationQuery] = useState("");
   const [pendingReplaceQuery, setPendingReplaceQuery] = useState("");
@@ -291,6 +291,63 @@ export default function AppsTab({
     setActivePlanId((currentId) => (currentId === planId ? null : currentId));
   };
 
+  const handleCompleteStep = (planId, stepId) => {
+    setTripPlans((currentPlans) =>
+      currentPlans.map((plan) => {
+        if (plan.id !== planId) return plan;
+
+        const completedSteps = plan.steps.map((step) =>
+          step.id === stepId ? { ...step, status: "complete" } : step
+        );
+        const nextStepIndex = completedSteps.findIndex(
+          (step) => step.status !== "complete"
+        );
+        const steps = completedSteps.map((step, index) => {
+          if (step.status === "complete") return step;
+          return {
+            ...step,
+            status: index === nextStepIndex ? "next" : "upcoming",
+          };
+        });
+        const completeCount = steps.filter(
+          (step) => step.status === "complete"
+        ).length;
+        const progress = Math.round((completeCount / steps.length) * 100);
+        const nextStep = steps.find((step) => step.status === "next");
+
+        return {
+          ...plan,
+          steps,
+          progress,
+          status: progress === 100 ? "Journey ready" : "Planning",
+          nextStep:
+            progress === 100
+              ? "Everything is confirmed"
+              : nextStep?.title || plan.nextStep,
+        };
+      })
+    );
+  };
+
+  const handleCompletePlan = (planId) => {
+    setTripPlans((currentPlans) =>
+      currentPlans.map((plan) =>
+        plan.id === planId
+          ? {
+              ...plan,
+              progress: 100,
+              status: "Journey ready",
+              nextStep: "Everything is confirmed",
+              steps: plan.steps.map((step) => ({
+                ...step,
+                status: "complete",
+              })),
+            }
+          : plan
+      )
+    );
+  };
+
   const handleReplacePlan = (planId) => {
     const query = pendingReplaceQuery;
     setPendingReplaceQuery("");
@@ -365,6 +422,8 @@ export default function AppsTab({
                 onNewPlan={handleRequestNewPlan}
                 onReplacePlan={handleReplacePlan}
                 onCancelReplace={() => setPendingReplaceQuery("")}
+                onCompleteStep={handleCompleteStep}
+                onCompletePlan={handleCompletePlan}
               />
             )}
           </div>

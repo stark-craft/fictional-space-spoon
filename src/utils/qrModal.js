@@ -7,7 +7,7 @@ import { triggerPurchaseNotification } from "./notify";
 let modalElement = null;
 let closeHandler = null;
 
-export function openQRModal(card) {
+export function openQRModal(card, options = {}) {
   closeQRModal();
 
   // Create overlay
@@ -212,6 +212,56 @@ export function openQRModal(card) {
     minWidth: "0",
   });
 
+  if (card.platform) {
+    const provider = document.createElement("div");
+
+    Object.assign(provider.style, {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "9px",
+      width: "fit-content",
+      padding: "6px 10px",
+      border: "1px solid rgba(255,255,255,0.12)",
+      borderRadius: "999px",
+      background: "rgba(255,255,255,0.06)",
+      color: "rgba(255,255,255,0.74)",
+      fontSize: "11px",
+      fontWeight: "700",
+    });
+
+    if (card.platformLogo) {
+      const logoWrap = document.createElement("span");
+      const logo = document.createElement("img");
+
+      Object.assign(logoWrap.style, {
+        display: "inline-flex",
+        width: "24px",
+        height: "24px",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "4px",
+        borderRadius: "7px",
+        background: "#fff",
+      });
+
+      Object.assign(logo.style, {
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+      });
+
+      logo.src = card.platformLogo;
+      logo.alt = "";
+      logoWrap.appendChild(logo);
+      provider.appendChild(logoWrap);
+    }
+
+    const providerName = document.createElement("span");
+    providerName.textContent = card.platform;
+    provider.appendChild(providerName);
+    rightSide.appendChild(provider);
+  }
+
   if (card.image) {
     const img = document.createElement("img");
     img.src = card.image;
@@ -280,18 +330,64 @@ export function openQRModal(card) {
     rightSide.appendChild(el);
   }
 
-  if (card.platform) {
-    const el = document.createElement("div");
+  const modalActions = document.createElement("div");
 
-    Object.assign(el.style, {
+  Object.assign(modalActions.style, {
+    display: "flex",
+    gap: "8px",
+    flexWrap: "wrap",
+    marginTop: "6px",
+  });
+
+  const makeActionButton = (label, primary = false) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.tabIndex = 0;
+    button.textContent = label;
+
+    Object.assign(button.style, {
+      minHeight: "38px",
+      padding: "0 14px",
+      border: primary
+        ? "1px solid rgba(154,255,231,0.54)"
+        : "1px solid rgba(255,255,255,0.14)",
+      borderRadius: "999px",
+      background: primary
+        ? "linear-gradient(135deg, #eafff9, #89f6dc)"
+        : "rgba(255,255,255,0.07)",
+      color: primary ? "#06202a" : "rgba(255,255,255,0.78)",
+      font: "inherit",
       fontSize: "11px",
-      color: "rgba(255,255,255,0.5)",
-      marginTop: "4px",
+      fontWeight: "750",
+      cursor: "pointer",
+      outline: "none",
+      transition: "transform 0.14s ease, box-shadow 0.14s ease",
     });
 
-    el.textContent = "Available on " + card.platform;
-    rightSide.appendChild(el);
-  }
+    button.addEventListener("focus", () => {
+      button.style.transform = "scale(1.04)";
+      button.style.boxShadow =
+        "0 0 0 2px rgba(255,255,255,0.76), 0 0 0 6px rgba(91,231,205,0.25)";
+    });
+
+    button.addEventListener("blur", () => {
+      button.style.transform = "scale(1)";
+      button.style.boxShadow = "none";
+    });
+
+    return button;
+  };
+
+  const completeBtn = options.onComplete
+    ? makeActionButton(options.isComplete ? "Payment complete" : "Complete payment", true)
+    : null;
+  const exploreBtn = options.onExplore
+    ? makeActionButton("Explore details")
+    : null;
+
+  if (completeBtn) modalActions.appendChild(completeBtn);
+  if (exploreBtn) modalActions.appendChild(exploreBtn);
+  if (completeBtn || exploreBtn) rightSide.appendChild(modalActions);
 
   content.appendChild(leftSide);
   content.appendChild(rightSide);
@@ -313,13 +409,31 @@ export function openQRModal(card) {
   // ─── Purchase handler ───
   const handlePurchase = () => {
     triggerPurchaseNotification(card.title);
+    options.onComplete?.();
     closeQRModal();
+  };
+
+  const handleExplore = () => {
+    closeQRModal();
+    window.setTimeout(() => options.onExplore?.(), 180);
   };
 
   qrBox.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
     handlePurchase();
+  });
+
+  completeBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handlePurchase();
+  });
+
+  exploreBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleExplore();
   });
 
   // ─── Keyboard handling inside modal ───
@@ -336,7 +450,7 @@ export function openQRModal(card) {
     27: "Escape",
   };
 
-  const focusables = [qrBox, cancelBtn];
+  const focusables = [qrBox, completeBtn, exploreBtn, cancelBtn].filter(Boolean);
   let fIdx = 0;
 
   closeHandler = (e) => {
@@ -374,6 +488,10 @@ export function openQRModal(card) {
 
       if (document.activeElement === qrBox) {
         handlePurchase();
+      } else if (document.activeElement === completeBtn) {
+        handlePurchase();
+      } else if (document.activeElement === exploreBtn) {
+        handleExplore();
       } else if (document.activeElement === cancelBtn) {
         closeQRModal();
       }

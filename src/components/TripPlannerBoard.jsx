@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { openQRModal } from "../utils/qrModal";
+import TripStepExplorer from "./TripStepExplorer";
 
 const MAX_PLANS = 3;
 
 function ProgressRing({ progress }) {
   return (
     <div
-      className="trip-plan-progress-ring"
+      className={`trip-plan-progress-ring ${progress === 100 ? "is-complete" : ""}`}
       style={{ "--trip-progress": `${progress * 3.6}deg` }}
       aria-label={`${progress}% planned`}
     >
@@ -18,7 +19,9 @@ function ProgressRing({ progress }) {
 function PlanWidget({ plan, active, onSelect }) {
   return (
     <div
-      className={`trip-plan-widget ${active ? "is-active" : ""}`}
+      className={`trip-plan-widget ${active ? "is-active" : ""} ${
+        plan.progress === 100 ? "is-complete" : ""
+      }`}
       style={{
         "--trip-accent": plan.accent,
         "--trip-accent-rgb": plan.accentRgb,
@@ -60,10 +63,31 @@ function PlanWidget({ plan, active, onSelect }) {
       </div>
 
       <div className="trip-plan-open-hint">
-        <span>Open journey</span>
+        <span>{plan.progress === 100 ? "View completed journey" : "Open journey"}</span>
         <span aria-hidden="true">›</span>
       </div>
     </div>
+  );
+}
+
+function ProviderMark({ step }) {
+  const [logoFailed, setLogoFailed] = useState(false);
+
+  return (
+    <span
+      className="trip-journey-provider-mark"
+      style={{ "--provider-color": step.providerColor }}
+    >
+      {step.providerLogo && !logoFailed ? (
+        <img
+          src={step.providerLogo}
+          alt=""
+          onError={() => setLogoFailed(true)}
+        />
+      ) : (
+        <span>{step.provider?.slice(0, 1) || "U"}</span>
+      )}
+    </span>
   );
 }
 
@@ -94,7 +118,14 @@ function EmptyPlanWidget({ index, isGenerating, onNewPlan }) {
   );
 }
 
-function JourneyWorkspace({ plan, onClose, onDelete }) {
+function JourneyWorkspace({
+  plan,
+  onClose,
+  onDelete,
+  onCompleteStep,
+  onCompletePlan,
+  onExploreStep,
+}) {
   const workspaceRef = useRef(null);
 
   useEffect(() => {
@@ -147,6 +178,16 @@ function JourneyWorkspace({ plan, onClose, onDelete }) {
         </div>
 
         <div className="trip-journey-hero-actions">
+          {plan.progress < 100 && (
+            <button
+              type="button"
+              className="trip-journey-action trip-journey-preview-complete"
+              tabIndex={0}
+              onClick={() => onCompletePlan(plan.id)}
+            >
+              Preview 100% state
+            </button>
+          )}
           <button
             type="button"
             className="trip-journey-action"
@@ -165,6 +206,20 @@ function JourneyWorkspace({ plan, onClose, onDelete }) {
           </button>
         </div>
       </div>
+
+      {plan.progress === 100 && (
+        <div className="trip-journey-complete-banner">
+          <span>✓</span>
+          <div>
+            <strong>Your complete journey is ready</strong>
+            <p>
+              Every stage is confirmed. The plan is now organised as one
+              connected, trip-ready itinerary.
+            </p>
+          </div>
+          <b>100%</b>
+        </div>
+      )}
 
       <div className="trip-journey-timeline" aria-label="Journey stages">
         {plan.steps.map((step, index) => (
@@ -187,7 +242,13 @@ function JourneyWorkspace({ plan, onClose, onDelete }) {
             className={`trip-journey-step is-${step.status}`}
             tabIndex={0}
             role="button"
-            onClick={() => openQRModal(step.qrData)}
+            onClick={() =>
+              openQRModal(step.qrData, {
+                isComplete: step.status === "complete",
+                onComplete: () => onCompleteStep(plan.id, step.id),
+                onExplore: () => onExploreStep(step.id),
+              })
+            }
           >
             <div className="trip-journey-step-image">
               <img src={step.image} alt="" loading="lazy" />
@@ -198,10 +259,15 @@ function JourneyWorkspace({ plan, onClose, onDelete }) {
                 <span>{step.label}</span>
                 <span>{step.status === "next" ? "Up next" : step.status}</span>
               </div>
+              <div className="trip-journey-step-provider">
+                <ProviderMark step={step} />
+                <span>{step.provider}</span>
+              </div>
               <h3>{step.title}</h3>
               <p>{step.description}</p>
+              <div className="trip-journey-step-meta">{step.meta}</div>
               <div className="trip-journey-step-action">
-                <span>{step.actionLabel}</span>
+                <span>{step.status === "complete" ? "Completed" : step.actionLabel}</span>
                 <span aria-hidden="true">›</span>
               </div>
             </div>
@@ -283,11 +349,16 @@ export default function TripPlannerBoard({
   onNewPlan,
   onReplacePlan,
   onCancelReplace,
+  onCompleteStep,
+  onCompletePlan,
 }) {
+  const [explorerStepId, setExplorerStepId] = useState(null);
   const activePlan = useMemo(
     () => plans.find((plan) => plan.id === activePlanId) || null,
     [activePlanId, plans]
   );
+  const explorerStep =
+    activePlan?.steps.find((step) => step.id === explorerStepId) || null;
   const emptySlotCount = Math.max(0, MAX_PLANS - plans.length);
 
   return (
@@ -328,6 +399,9 @@ export default function TripPlannerBoard({
           plan={activePlan}
           onClose={onClosePlan}
           onDelete={onDeletePlan}
+          onCompleteStep={onCompleteStep}
+          onCompletePlan={onCompletePlan}
+          onExploreStep={setExplorerStepId}
         />
       )}
 
@@ -337,6 +411,24 @@ export default function TripPlannerBoard({
           pendingQuery={pendingReplaceQuery}
           onReplace={onReplacePlan}
           onCancel={onCancelReplace}
+        />
+      )}
+
+      {activePlan && explorerStep && (
+        <TripStepExplorer
+          key={`${activePlan.id}-${explorerStep.id}`}
+          plan={activePlan}
+          step={explorerStep}
+          isComplete={explorerStep.status === "complete"}
+          onClose={() => setExplorerStepId(null)}
+          onComplete={() => onCompleteStep(activePlan.id, explorerStep.id)}
+          onOpenQR={() =>
+            openQRModal(explorerStep.qrData, {
+              isComplete: explorerStep.status === "complete",
+              onComplete: () => onCompleteStep(activePlan.id, explorerStep.id),
+              onExplore: () => setExplorerStepId(explorerStep.id),
+            })
+          }
         />
       )}
     </div>
