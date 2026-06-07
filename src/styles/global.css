@@ -5126,6 +5126,11 @@ body,
   opacity: 0.64;
 }
 
+.ai-intent-input:read-only {
+  cursor: wait;
+  opacity: 0.86;
+}
+
 .ai-intent-generating,
 .ai-intent-status {
   display: inline-flex;

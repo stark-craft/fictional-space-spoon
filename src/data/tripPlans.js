@@ -594,17 +594,37 @@ export function getFeaturedTripPlans() {
 }
 
 export function createTripPlan(query, sequence = 0) {
-  const normalizedQuery = query.toLowerCase();
-  let selectedPlan = FEATURED_TRIP_PLANS[0];
+  const normalizedQuery = query
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  let selectedPlan = null;
 
   if (
-    /england|london|britain|united kingdom|\buk\b/.test(normalizedQuery)
+    /\b(england|london|britain|british|united kingdom|great britain|uk|u k|oxford|bath|cotswolds|stonehenge|westminster|buckingham|royal|tube|oyster|premier league)\b/.test(
+      normalizedQuery
+    )
   ) {
     selectedPlan = FEATURED_TRIP_PLANS[1];
   } else if (
-    /america|united states|\busa\b|new york|san francisco/.test(normalizedQuery)
+    /\b(america|american|united states|united state|states|usa|u s a|us|u s|new york|nyc|san francisco|california|broadway|amtrak|national park|national parks|yellowstone|yosemite|grand canyon|coast to coast)\b/.test(
+      normalizedQuery
+    )
   ) {
     selectedPlan = FEATURED_TRIP_PLANS[2];
+  } else if (
+    /\b(switzerland|swiss|zurich|lucerne|interlaken|alps|alpine|jungfrau|jungfraujoch|zermatt|matterhorn|glacier express|scenic train)\b/.test(
+      normalizedQuery
+    )
+  ) {
+    selectedPlan = FEATURED_TRIP_PLANS[0];
+  }
+
+  if (!selectedPlan) {
+    const fallbackIndex =
+      ((Math.max(1, sequence) - 1) % FEATURED_TRIP_PLANS.length);
+    selectedPlan = FEATURED_TRIP_PLANS[fallbackIndex];
   }
 
   return clonePlan(selectedPlan, `${selectedPlan.id}-${Date.now()}-${sequence}`);

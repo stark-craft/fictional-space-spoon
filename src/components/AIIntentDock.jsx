@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-const DEFAULT_QUERY = "I want to go on a trip to Switzerland";
+const DEFAULT_QUERY = "Plan my next connected journey";
 
 function getMappedKey(e) {
   const keyMap = {
@@ -21,9 +21,11 @@ export default function AIIntentDock({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [inputValue, setInputValue] = useState("");
+  const sectionRef = useRef(null);
   const inputRef = useRef(null);
   const submitRef = useRef(null);
   const handledOpenRequestRef = useRef(0);
+  const wasGeneratingRef = useRef(false);
 
   useEffect(() => {
     if (!expanded) return;
@@ -50,6 +52,29 @@ export default function AIIntentDock({
     return () => window.clearTimeout(timer);
   }, [isGenerating, openRequestToken]);
 
+  useEffect(() => {
+    if (isGenerating) {
+      wasGeneratingRef.current = true;
+      setExpanded(true);
+
+      const timer = window.setTimeout(() => {
+        sectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+        inputRef.current?.focus({ preventScroll: true });
+      }, 80);
+
+      return () => window.clearTimeout(timer);
+    }
+
+    if (wasGeneratingRef.current) {
+      wasGeneratingRef.current = false;
+      setInputValue("");
+      setExpanded(false);
+    }
+  }, [isGenerating]);
+
   const submitIntent = () => {
     if (isGenerating) return;
 
@@ -57,8 +82,21 @@ export default function AIIntentDock({
     const accepted = onSubmitIntent?.(query);
 
     if (accepted !== false) {
-      setInputValue("");
-      setExpanded(false);
+      if (accepted === "replace") {
+        setInputValue("");
+        setExpanded(false);
+      } else {
+        setInputValue(query);
+        setExpanded(true);
+
+        requestAnimationFrame(() => {
+          sectionRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+          inputRef.current?.focus({ preventScroll: true });
+        });
+      }
     }
   };
 
@@ -133,7 +171,7 @@ export default function AIIntentDock({
   };
 
   return (
-    <div className="ai-intent-section">
+    <div className="ai-intent-section" ref={sectionRef}>
       <div
         className={`ai-intent-dock ${expanded ? "expanded" : "compact"} ${
           isGenerating ? "is-generating" : ""
@@ -166,7 +204,8 @@ export default function AIIntentDock({
               className="ai-intent-input"
               tabIndex={0}
               value={inputValue}
-              disabled={isGenerating}
+              readOnly={isGenerating}
+              aria-busy={isGenerating ? "true" : "false"}
               placeholder="I want to go on a trip to Switzerland…"
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleInputKeyDown}

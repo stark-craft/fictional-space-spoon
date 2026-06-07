@@ -91,28 +91,21 @@ function ProviderMark({ step }) {
   );
 }
 
-function EmptyPlanWidget({ index, isGenerating, onNewPlan }) {
+function BuildingPlanWidget() {
   return (
     <div
-      className={`trip-plan-widget trip-plan-empty-widget ${
-        isGenerating ? "is-building" : ""
-      }`}
-      tabIndex={isGenerating ? -1 : 0}
-      role={isGenerating ? "status" : "button"}
-      aria-label={isGenerating ? "Building a new trip plan" : "Start another plan"}
-      onClick={isGenerating ? undefined : onNewPlan}
+      className="trip-plan-widget trip-plan-empty-widget is-building"
+      tabIndex={-1}
+      role="status"
+      aria-label="Building a new trip plan"
     >
       <div className="trip-plan-empty-orb">
-        <span>{isGenerating ? "" : "+"}</span>
+        <span />
       </div>
       <div className="trip-plan-empty-copy">
-        <span>{isGenerating ? "Universal Guide is building" : `Plan ${index + 1}`}</span>
-        <strong>{isGenerating ? "Connecting your journey…" : "Start another journey"}</strong>
-        <small>
-          {isGenerating
-            ? "Discovering the route, stays, and experiences"
-            : "Ask once, then return here anytime"}
-        </small>
+        <span>Universal Guide is building</span>
+        <strong>Connecting your journey…</strong>
+        <small>Discovering the route, stays, and experiences</small>
       </div>
     </div>
   );
@@ -136,11 +129,17 @@ function JourneyWorkspace({
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      workspaceRef.current?.scrollIntoView({
+      const firstStep = workspaceRef.current?.querySelector(
+        ".trip-journey-step[tabindex='0']"
+      );
+
+      firstStep?.focus({ preventScroll: true });
+      firstStep?.scrollIntoView({
         behavior: "smooth",
-        block: "start",
+        block: "center",
+        inline: "nearest",
       });
-    }, 120);
+    }, 180);
 
     return () => window.clearTimeout(timer);
   }, [plan.id]);
@@ -346,7 +345,6 @@ export default function TripPlannerBoard({
   onSelectPlan,
   onClosePlan,
   onDeletePlan,
-  onNewPlan,
   onReplacePlan,
   onCancelReplace,
   onCompleteStep,
@@ -359,7 +357,6 @@ export default function TripPlannerBoard({
   );
   const explorerStep =
     activePlan?.steps.find((step) => step.id === explorerStepId) || null;
-  const emptySlotCount = Math.max(0, MAX_PLANS - plans.length);
 
   return (
     <div className="section trip-planner-board">
@@ -383,14 +380,7 @@ export default function TripPlannerBoard({
           />
         ))}
 
-        {Array.from({ length: emptySlotCount }).map((_, index) => (
-          <EmptyPlanWidget
-            key={`empty-plan-${index}`}
-            index={plans.length + index}
-            isGenerating={isGenerating && index === 0}
-            onNewPlan={onNewPlan}
-          />
-        ))}
+        {isGenerating && <BuildingPlanWidget />}
       </div>
 
       {activePlan && (

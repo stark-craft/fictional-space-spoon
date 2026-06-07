@@ -236,19 +236,59 @@ export default function useKeyNavigation(onHeroExpand, onHeroCollapse) {
       );
 
       if (tripPlanLimitOverlay) {
-        if (
-          mappedKey === "Back" ||
-          mappedKey === "Backspace" ||
-          mappedKey === "Escape" ||
-          mappedKey === "XF86Back"
-        ) {
+        const consumeLimitKey = () => {
           try {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
           } catch (_) {}
+        };
+        const limitItems = Array.from(
+          tripPlanLimitOverlay.querySelectorAll("[tabindex='0']")
+        );
+        const focusedLimitItem = focusedEl?.closest?.(
+          "#trip-plan-limit-overlay [tabindex='0']"
+        );
+        const currentLimitIndex = limitItems.indexOf(focusedLimitItem);
 
+        if (
+          mappedKey === "Back" ||
+          mappedKey === "Backspace" ||
+          mappedKey === "Escape" ||
+          mappedKey === "Delete" ||
+          mappedKey === "XF86Back"
+        ) {
+          consumeLimitKey();
           window.dispatchEvent(new CustomEvent("trip-plan-limit-close"));
+          return;
+        }
+
+        if (mappedKey === "Enter") {
+          consumeLimitKey();
+          focusedLimitItem?.click();
+          return;
+        }
+
+        if (
+          mappedKey === "ArrowDown" ||
+          mappedKey === "ArrowRight" ||
+          mappedKey === "ArrowUp" ||
+          mappedKey === "ArrowLeft"
+        ) {
+          consumeLimitKey();
+
+          if (limitItems.length === 0) return;
+
+          const direction =
+            mappedKey === "ArrowDown" || mappedKey === "ArrowRight" ? 1 : -1;
+          const fallbackIndex = direction > 0 ? 0 : limitItems.length - 1;
+          const nextIndex =
+            currentLimitIndex >= 0
+              ? (currentLimitIndex + direction + limitItems.length) %
+                limitItems.length
+              : fallbackIndex;
+
+          limitItems[nextIndex]?.focus({ preventScroll: true });
           return;
         }
       }
@@ -256,34 +296,110 @@ export default function useKeyNavigation(onHeroExpand, onHeroCollapse) {
       const tripPlannerBoard = focusedEl?.closest?.(".trip-planner-board");
 
       if (tripPlannerBoard) {
+        const consumeTripKey = () => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+          } catch (_) {}
+        };
+        const focusFirstJourneyStep = () => {
+          window.setTimeout(() => {
+            const firstStep = tripPlannerBoard.querySelector(
+              ".trip-journey-step[tabindex='0']"
+            );
+
+            if (!firstStep) return;
+
+            firstStep.focus({ preventScroll: true });
+            scheduleScroll(firstStep, { block: "center", behavior: "smooth" });
+          }, 140);
+        };
         const focusedTripWidget = focusedEl?.closest?.(".trip-plan-widget");
+        const focusedJourneyStep = focusedEl?.closest?.(".trip-journey-step");
         const focusedJourneyWorkspace = focusedEl?.closest?.(
           ".trip-journey-workspace"
         );
 
-        if (
-          focusedTripWidget &&
-          mappedKey === "ArrowDown" &&
-          tripPlannerBoard.querySelector(".trip-journey-workspace")
-        ) {
-          try {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-          } catch (_) {}
-
-          tripPlannerBoard
-            .querySelector(".trip-journey-step[tabindex='0']")
-            ?.focus({ preventScroll: true });
+        if (focusedTripWidget && mappedKey === "Enter") {
+          consumeTripKey();
+          focusedTripWidget.click();
           return;
         }
 
+        if (focusedTripWidget && mappedKey === "ArrowDown") {
+          consumeTripKey();
+
+          if (!tripPlannerBoard.querySelector(".trip-journey-workspace")) {
+            focusedTripWidget.click();
+          }
+
+          focusFirstJourneyStep();
+          return;
+        }
+
+        if (focusedJourneyStep) {
+          const journeySteps = Array.from(
+            tripPlannerBoard.querySelectorAll(".trip-journey-step[tabindex='0']")
+          );
+          const currentStepIndex = journeySteps.indexOf(focusedJourneyStep);
+          const stepGrid = focusedJourneyStep.closest(".trip-journey-step-grid");
+          const gridTemplateColumns = stepGrid
+            ? window.getComputedStyle(stepGrid).gridTemplateColumns
+            : "";
+          const gridColumns =
+            gridTemplateColumns.split(" ").filter(Boolean).length || 3;
+
+          const focusJourneyStep = (nextIndex) => {
+            if (nextIndex < 0 || nextIndex >= journeySteps.length) return false;
+
+            consumeTripKey();
+            journeySteps[nextIndex]?.focus({ preventScroll: true });
+            scheduleScroll(journeySteps[nextIndex], {
+              block: "center",
+              behavior: "smooth",
+            });
+            return true;
+          };
+
+          if (mappedKey === "Enter") {
+            consumeTripKey();
+            focusedJourneyStep.click();
+            return;
+          }
+
+          if (mappedKey === "ArrowLeft") {
+            if (!focusJourneyStep(currentStepIndex - 1)) consumeTripKey();
+            return;
+          }
+
+          if (mappedKey === "ArrowRight") {
+            if (!focusJourneyStep(currentStepIndex + 1)) consumeTripKey();
+            return;
+          }
+
+          if (mappedKey === "ArrowDown") {
+            if (focusJourneyStep(currentStepIndex + gridColumns)) {
+              return;
+            }
+          }
+
+          if (mappedKey === "ArrowUp") {
+            if (currentStepIndex - gridColumns >= 0) {
+              focusJourneyStep(currentStepIndex - gridColumns);
+              return;
+            }
+
+            consumeTripKey();
+            tripPlannerBoard
+              .querySelector("[data-trip-widget-active='true']")
+              ?.focus({ preventScroll: true });
+            return;
+          }
+        }
+
         if (focusedJourneyWorkspace && mappedKey === "ArrowUp") {
-          try {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-          } catch (_) {}
+          consumeTripKey();
 
           tripPlannerBoard
             .querySelector("[data-trip-widget-active='true']")
@@ -298,11 +414,7 @@ export default function useKeyNavigation(onHeroExpand, onHeroCollapse) {
             mappedKey === "Escape" ||
             mappedKey === "XF86Back")
         ) {
-          try {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-          } catch (_) {}
+          consumeTripKey();
 
           window.dispatchEvent(new CustomEvent("trip-workspace-close"));
           return;
@@ -312,6 +424,27 @@ export default function useKeyNavigation(onHeroExpand, onHeroCollapse) {
       const expandedAiDock = focusedEl?.closest?.(".ai-intent-dock.expanded");
 
       if (expandedAiDock) {
+        const generatingInDock =
+          expandedAiDock.classList?.contains("is-generating");
+
+        if (
+          generatingInDock &&
+          ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter"].includes(
+            mappedKey
+          )
+        ) {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+          } catch (_) {}
+
+          expandedAiDock
+            .querySelector(".ai-intent-input")
+            ?.focus({ preventScroll: true });
+          return;
+        }
+
         if (
           mappedKey === "Enter" ||
           mappedKey === "Back" ||

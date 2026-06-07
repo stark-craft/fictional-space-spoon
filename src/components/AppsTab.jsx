@@ -4,7 +4,7 @@ import PromoRow from "./PromoRow";
 import AIIntentDock from "./AIIntentDock";
 import TripPlannerBoard from "./TripPlannerBoard";
 import { appsPromos } from "../data/promoContent";
-import { createTripPlan, getFeaturedTripPlans } from "../data/tripPlans";
+import { createTripPlan } from "../data/tripPlans";
 import {
   samsungRecommended,
   editorsChoice,
@@ -192,11 +192,10 @@ export default function AppsTab({
   const aiGenerationTimerRef = useRef(null);
   const planSequenceRef = useRef(0);
   const [isGeneratingAiRow, setIsGeneratingAiRow] = useState(false);
-  const [tripPlans, setTripPlans] = useState(getFeaturedTripPlans);
+  const [tripPlans, setTripPlans] = useState([]);
   const [activePlanId, setActivePlanId] = useState(null);
   const [generationQuery, setGenerationQuery] = useState("");
   const [pendingReplaceQuery, setPendingReplaceQuery] = useState("");
-  const [intentDockOpenRequest, setIntentDockOpenRequest] = useState(0);
   let sIdx = 2;
   const personalizedAppsPromos = useMemo(
     () => {
@@ -222,26 +221,34 @@ export default function AppsTab({
   };
 
   const focusTripPlan = (planId) => {
+    const focusPlanWidget = (attempt = 0) => {
+      const boardEl = tripPlannerRef.current;
+      const planWidget = boardEl?.querySelector(
+        `[data-trip-plan-id="${planId}"]`
+      );
+
+      if (!planWidget) {
+        if (attempt < 5) {
+          window.setTimeout(() => focusPlanWidget(attempt + 1), 90);
+        }
+        return;
+      }
+
+      planWidget.focus({ preventScroll: true });
+      planWidget.scrollIntoView({
+        behavior: attempt === 0 ? "smooth" : "auto",
+        block: "center",
+        inline: "nearest",
+      });
+
+      if (attempt < 2) {
+        window.setTimeout(() => focusPlanWidget(attempt + 1), 180);
+      }
+    };
+
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const boardEl = tripPlannerRef.current;
-        const planWidget = boardEl?.querySelector(
-          `[data-trip-plan-id="${planId}"]`
-        );
-
-        boardEl?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-
-        window.setTimeout(() => {
-          planWidget?.focus();
-          planWidget?.scrollIntoView({
-            behavior: "auto",
-            block: "center",
-            inline: "nearest",
-          });
-        }, 180);
+        window.setTimeout(() => focusPlanWidget(), 80);
       });
     });
   };
@@ -250,14 +257,22 @@ export default function AppsTab({
     window.clearTimeout(aiGenerationTimerRef.current);
     onSponsoredBlur?.();
     setGenerationQuery(query);
+    setActivePlanId(null);
     setIsGeneratingAiRow(true);
+
+    requestAnimationFrame(() => {
+      aiIntentSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
 
     aiGenerationTimerRef.current = window.setTimeout(() => {
       planSequenceRef.current += 1;
       const plan = createTripPlan(query, planSequenceRef.current);
 
       setTripPlans((currentPlans) => [...currentPlans, plan].slice(-3));
-      setActivePlanId(plan.id);
+      setActivePlanId(null);
       setGenerationQuery("");
       setIsGeneratingAiRow(false);
       focusTripPlan(plan.id);
@@ -273,11 +288,11 @@ export default function AppsTab({
         behavior: "smooth",
         block: "center",
       });
-      return true;
+      return "replace";
     }
 
     buildTripPlan(query);
-    return true;
+    return "generating";
   };
 
   const handleSelectPlan = (planId) => {
@@ -358,11 +373,15 @@ export default function AppsTab({
     buildTripPlan(query);
   };
 
-  const handleRequestNewPlan = () => {
-    setIntentDockOpenRequest((request) => request + 1);
+  const handleCancelReplace = () => {
+    setPendingReplaceQuery("");
 
     requestAnimationFrame(() => {
-      aiIntentSectionRef.current?.scrollIntoView({
+      const focusTarget = aiIntentSectionRef.current?.querySelector(
+        "[tabindex='0']"
+      );
+      focusTarget?.focus({ preventScroll: true });
+      focusTarget?.scrollIntoView({
         behavior: "smooth",
         block: "center",
       });
@@ -419,9 +438,8 @@ export default function AppsTab({
                 onSelectPlan={handleSelectPlan}
                 onClosePlan={() => setActivePlanId(null)}
                 onDeletePlan={handleDeletePlan}
-                onNewPlan={handleRequestNewPlan}
                 onReplacePlan={handleReplacePlan}
-                onCancelReplace={() => setPendingReplaceQuery("")}
+                onCancelReplace={handleCancelReplace}
                 onCompleteStep={handleCompleteStep}
                 onCompletePlan={handleCompletePlan}
               />
@@ -472,7 +490,6 @@ export default function AppsTab({
               onSubmitIntent={handleSubmitIntent}
               isGenerating={isGeneratingAiRow}
               planCount={tripPlans.length}
-              openRequestToken={intentDockOpenRequest}
             />
           </div>
         );
